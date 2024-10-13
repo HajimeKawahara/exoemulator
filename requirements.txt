@@ -1,3 +1,5 @@
 exojax
 jax
 jaxlib
+flax
+tqdm
