@@ -29,3 +29,14 @@ def test_generate_batches_incomplete_batch():
     assert (batches[0][1] == jnp.array([1, 2])).all()
     assert (batches[1][0] == jnp.array([[5, 6]])).all()
     assert (batches[1][1] == jnp.array([3])).all()
+
+def test_generate_batches_temp():
+    data = jnp.array([1,2,3,4,5,6,7,8,9,10])
+    batch_size = 4
+    batches = list(generate_batches(data, data, batch_size))
+    print(batches)
+
+if __name__ == "__main__":
+    test_generate_batches()
+    test_generate_batches_incomplete_batch()
+    test_generate_batches_temp()
