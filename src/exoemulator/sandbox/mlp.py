@@ -71,26 +71,38 @@ class MlpLikePayne(nnx.Module):
         # return nnx.sigmoid(self.dense_out(x)) #limit to [0,1]
 
 
-def loss_fn(model: MlpLikePayne, batch):
-    output_vector = model(batch)
+def loss_fn(model: MlpLikePayne, batch_input_parameter, batch_label_vector):
+    batch_output_vector = model(batch_input_parameter)
+    loss = jnp.mean((batch_output_vector - batch_label_vector) ** 2)
+    return loss, batch_output_vector
 
 
-@jax.jit
-def train_step(state, x, y):
-    """update function
+@nnx.jit
+def train_step(
+    model: MlpLikePayne,
+    optimizer: nnx.Optimizer,
+    metric: nnx.MultiMetric,
+    batch_input_parameter,
+    batch_label_vector,
+):
+    grad_fn = nnx.value_and_grad(loss_fn, has_aux=True)
+    (loss, batch_output_vector), grads = grad_fn(
+        model, batch_input_parameter, batch_label_vector
+    )
+    #metric.update(loss=loss)
+    optimizer.update(grads)
 
-    Args:
-        state (_type_): state of the model
-        x (_type_): x
-        y (_type_): y
 
-    Returns:
-        updated state of the model
-    """
-    loss, grad = jax.value_and_grad(loss_fn, argnums=1)(state, state.params, x, y)
-    updates, new_opt_state = state.tx.update(grad, state.opt_state)
-    new_params = optax.apply_updates(state.params, updates)
-    return state.replace(params=new_params, opt_state=new_opt_state), loss
+@nnx.jit
+def eval_step(
+    model: MlpLikePayne,
+    metric: nnx.MultiMetric,
+    batch_input_parameter,
+    batch_label_vector,
+):
+    batch_output_vector = model(batch_input_parameter)
+    loss = jnp.mean((batch_output_vector - batch_label_vector) ** 2)
+    metric.update(loss=loss)
 
 
 if __name__ == "__main__":
@@ -100,32 +112,40 @@ if __name__ == "__main__":
 
     grid_length = 1024
     nlabel = 100
-    phase_label = np.random.rand(nlabel) * 2 * np.pi
+    input_phase = np.random.rand(nlabel) * 2 * np.pi
 
-    x, y = generate_sin_curve(phase_label, 0.0, grid_length)
-    # y = y.reshape(-1, 1)
-    # x = x.reshape(-1, 1)
-    phase_label = phase_label.reshape(-1, 1)
-    print(phase_label.shape, x.shape, y.shape)
+    _x, label_sin_vector = generate_sin_curve(input_phase, 0.0, grid_length)
+    input_phase = input_phase.reshape(-1, 1)
+    print(input_phase.shape, label_sin_vector.shape)
 
     model = MlpLikePayne(rngs=nnx.Rngs(0))
 
     # single input parameter
     input_parameter = jnp.ones((1,))
-    y = model(input_parameter)
-    print(input_parameter.shape, "->", y.shape)
+    output_vector = model(input_parameter)
+    print(input_parameter.shape, "->", output_vector.shape)
 
     # batch input parameter
     nbatch = 64
     batch_input_parameter = jnp.ones((nbatch, 1))
-    y = model(batch_input_parameter)
-    print(batch_input_parameter.shape, "->", y.shape)
+    output_vector = model(batch_input_parameter)
+    print(batch_input_parameter.shape, "->", output_vector.shape)
 
-    exit()
-
+    # optimizer
     learning_rate = 1e-3
     momentum = 0.9
     optimizer = nnx.Optimizer(model, optax.adamw(learning_rate, momentum))
     metrics = nnx.MultiMetric(
         accuracy=nnx.metrics.Accuracy(), loss=nnx.metrics.Average("loss")
     )
+
+    # nonbatch training 
+    for i in tqdm.trange(1000):
+        train_step(model, optimizer, metrics, input_phase, label_sin_vector)
+
+    # single input parameter
+    input_parameter = jnp.ones((1,))*jnp.pi
+    output_vector = model(input_parameter)
+
+    plt.plot(_x, output_vector, "-")
+    plt.show()  
