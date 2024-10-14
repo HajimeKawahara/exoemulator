@@ -1,3 +1,10 @@
+"""
+Notes:
+    Normally, consider to use jax.vmap instead of generate_batches
+    See https://jax.readthedocs.io/en/latest/notebooks/vmapped_log_probs.html
+"""
+
+
 import jax.numpy as jnp
 
 
