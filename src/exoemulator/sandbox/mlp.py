@@ -140,7 +140,7 @@ if __name__ == "__main__":
     )
 
     # training
-    no_batch = False
+    no_batch = True
     if no_batch:
         # nonbatch training 
         for i in tqdm.trange(1000):
@@ -150,6 +150,7 @@ if __name__ == "__main__":
         input_parameter = jnp.ones((1,))*jnp.pi
         output_vector = model(input_parameter)
         plt.plot(_x, output_vector, "-")
+        plt.savefig("sin.png")
         plt.show()  
     else:
         print("")
