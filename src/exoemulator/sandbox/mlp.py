@@ -102,7 +102,7 @@ def eval_step(
 ):
     batch_output_vector = model(batch_input_parameter)
     loss = jnp.mean((batch_output_vector - batch_label_vector) ** 2)
-    metric.update(loss=loss)
+    #metric.update(loss=loss)
 
 
 if __name__ == "__main__":
