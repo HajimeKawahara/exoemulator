@@ -47,7 +47,7 @@ def plot_curve(x, y, ypred=None):
     return plt
 
 
-class MlpLikePayne(nnx.Module):
+class MLP(nnx.Module):
     """simple MLP model Like the Payne
 
     Args:
@@ -57,21 +57,24 @@ class MlpLikePayne(nnx.Module):
 
     def __init__(self, *, rngs: nnx.Rngs):
         grid_length = 1024
-        self.dense_entrance = nnx.Linear(in_features=1, out_features=128, rngs=rngs)
-        self.dense = nnx.Linear(in_features=128, out_features=128, rngs=rngs)
+        nneuron = 128
+        self.dense_entrance = nnx.Linear(in_features=1, out_features=nneuron, rngs=rngs)
+        self.dense = nnx.Linear(in_features=nneuron, out_features=nneuron, rngs=rngs)
         self.dense_out = nnx.Linear(
-            in_features=128, out_features=grid_length, rngs=rngs
+            in_features=nneuron, out_features=grid_length, rngs=rngs
         )
 
     def __call__(self, input_parameter):
         x = nnx.gelu(self.dense_entrance(input_parameter))
         x = nnx.gelu(self.dense(x))
         x = nnx.gelu(self.dense(x))
+        x = nnx.gelu(self.dense(x))
+        x = nnx.gelu(self.dense(x))
         return self.dense_out(x)
         # return nnx.sigmoid(self.dense_out(x)) #limit to [0,1]
 
 
-def loss_fn(model: MlpLikePayne, batch_input_parameter, batch_label_vector):
+def loss_fn(model: MLP, batch_input_parameter, batch_label_vector):
     batch_output_vector = model(batch_input_parameter)
     loss = jnp.mean((batch_output_vector - batch_label_vector) ** 2)
     return loss, batch_output_vector
@@ -79,7 +82,7 @@ def loss_fn(model: MlpLikePayne, batch_input_parameter, batch_label_vector):
 
 @nnx.jit
 def train_step(
-    model: MlpLikePayne,
+    model: MLP,
     optimizer: nnx.Optimizer,
     metric: nnx.MultiMetric,
     batch_input_parameter,
@@ -89,47 +92,49 @@ def train_step(
     (loss, batch_output_vector), grads = grad_fn(
         model, batch_input_parameter, batch_label_vector
     )
-    #metric.update(loss=loss)
+    # metric.update(loss=loss)
     optimizer.update(grads)
 
 
 @nnx.jit
 def eval_step(
-    model: MlpLikePayne,
+    model: MLP,
     metric: nnx.MultiMetric,
     batch_input_parameter,
     batch_label_vector,
 ):
     batch_output_vector = model(batch_input_parameter)
     loss = jnp.mean((batch_output_vector - batch_label_vector) ** 2)
-    #metric.update(loss=loss)
+    # metric.update(loss=loss)
 
 
 if __name__ == "__main__":
     import jax.numpy as jnp
     import numpy as np
     import optax
+    from exoemulator.model.batch import generate_batches
 
     grid_length = 1024
-    nlabel = 100
-    input_phase = np.random.rand(nlabel) * 2 * np.pi
-
+    nsample = 512
+    input_phase = np.random.rand(nsample) * 2 * np.pi
     _x, label_sin_vector = generate_sin_curve(input_phase, 0.0, grid_length)
     input_phase = input_phase.reshape(-1, 1)
     print(input_phase.shape, label_sin_vector.shape)
 
-    model = MlpLikePayne(rngs=nnx.Rngs(0))
+    # batch
+    batch_size = 32
+    input_parameter_batches = generate_batches(input_phase, batch_size)
+    label_vector_batches = generate_batches(label_sin_vector, batch_size)
+
+    # MLP model
+    model = MLP(rngs=nnx.Rngs(0))
 
     # single input parameter
-    input_parameter = jnp.ones((1,))
-    output_vector = model(input_parameter)
-    print(input_parameter.shape, "->", output_vector.shape)
-
+    output_vector = model(input_phase[0])
+    print(input_phase[0].shape, "->", output_vector.shape)
     # batch input parameter
-    nbatch = 64
-    batch_input_parameter = jnp.ones((nbatch, 1))
-    output_vector = model(batch_input_parameter)
-    print(batch_input_parameter.shape, "->", output_vector.shape)
+    output_vector = model(input_parameter_batches[0])
+    print(input_parameter_batches[0].shape, "->", output_vector.shape)
 
     # optimizer
     learning_rate = 1e-3
@@ -140,17 +145,39 @@ if __name__ == "__main__":
     )
 
     # training
-    no_batch = True
-    if no_batch:
-        # nonbatch training 
+    batch_training = True
+    # batch_training= False
+
+    import time
+
+    start = time.time()
+    if batch_training:
+        print("batch training")
         for i in tqdm.trange(1000):
             train_step(model, optimizer, metrics, input_phase, label_sin_vector)
 
-        # single input parameter
-        input_parameter = jnp.ones((1,))*jnp.pi
-        output_vector = model(input_parameter)
-        plt.plot(_x, output_vector, "-")
-        plt.savefig("sin.png")
-        plt.show()  
     else:
-        print("")
+        print("minibatch training")
+        for i in tqdm.trange(100):
+            for istep, batch_input_parameter in enumerate(input_parameter_batches):
+                batch_label_vector = label_vector_batches[istep]
+                train_step(
+                    model, optimizer, metrics, batch_input_parameter, batch_label_vector
+                )
+
+    print("elapsed time:", time.time() - start)
+    # single input parameter
+    phase = jnp.pi
+    input_phase = jnp.ones((1,)) * phase
+    output_vector = model(input_phase)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(211)
+    plt.plot(_x, output_vector, "-")
+    plt.plot(_x, jnp.sin(_x + phase), alpha=0.3, lw=4)
+
+    ax = fig.add_subplot(212)
+    plt.plot(_x, output_vector - jnp.sin(_x + phase))
+
+    plt.savefig("sin.png")
+    plt.show()
