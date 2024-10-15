@@ -139,13 +139,18 @@ if __name__ == "__main__":
         accuracy=nnx.metrics.Accuracy(), loss=nnx.metrics.Average("loss")
     )
 
-    # nonbatch training 
-    for i in tqdm.trange(1000):
-        train_step(model, optimizer, metrics, input_phase, label_sin_vector)
+    # training
+    no_batch = True
+    if no_batch:
+        # nonbatch training 
+        for i in tqdm.trange(1000):
+            train_step(model, optimizer, metrics, input_phase, label_sin_vector)
 
-    # single input parameter
-    input_parameter = jnp.ones((1,))*jnp.pi
-    output_vector = model(input_parameter)
-
-    plt.plot(_x, output_vector, "-")
-    plt.show()  
+        # single input parameter
+        input_parameter = jnp.ones((1,))*jnp.pi
+        output_vector = model(input_parameter)
+        plt.plot(_x, output_vector, "-")
+        plt.savefig("sin.png")
+        plt.show()  
+    else:
+        print("")
