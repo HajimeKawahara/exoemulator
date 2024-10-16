@@ -1,6 +1,4 @@
-exojax
 jax
 jaxlib
 flax
 tqdm
-numpy<2
