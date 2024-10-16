@@ -8,6 +8,7 @@ from jax import random
 from flax import nnx
 import tqdm
 import optax
+import time
 
 
 def generate_sin_curve(phase, std, num_points):
@@ -74,10 +75,10 @@ class MLP(nnx.Module):
         # return nnx.sigmoid(self.dense_out(x)) #limit to [0,1]
 
 
-def loss_fn(model: MLP, batch_input_parameter, batch_label_vector):
-    batch_output_vector = model(batch_input_parameter)
-    loss = jnp.mean((batch_output_vector - batch_label_vector) ** 2)
-    return loss, batch_output_vector
+def loss_fn(model: MLP, input_parameter, label_vector):
+    output_vector = model(input_parameter)
+    loss = jnp.mean((output_vector - label_vector) ** 2)
+    return loss, output_vector
 
 
 @nnx.jit
@@ -85,14 +86,12 @@ def train_step(
     model: MLP,
     optimizer: nnx.Optimizer,
     metric: nnx.MultiMetric,
-    batch_input_parameter,
-    batch_label_vector,
+    input_parameter,
+    label_vector,
 ):
     grad_fn = nnx.value_and_grad(loss_fn, has_aux=True)
-    (loss, batch_output_vector), grads = grad_fn(
-        model, batch_input_parameter, batch_label_vector
-    )
-    # metric.update(loss=loss)
+    (loss, output_vector), grads = grad_fn(model, input_parameter, label_vector)
+    metric.update(loss=loss)
     optimizer.update(grads)
 
 
@@ -100,12 +99,12 @@ def train_step(
 def eval_step(
     model: MLP,
     metric: nnx.MultiMetric,
-    batch_input_parameter,
-    batch_label_vector,
+    input_parameter,
+    label_vector,
 ):
-    batch_output_vector = model(batch_input_parameter)
-    loss = jnp.mean((batch_output_vector - batch_label_vector) ** 2)
-    # metric.update(loss=loss)
+    batch_output_vector = model(input_parameter)
+    loss = jnp.mean((batch_output_vector - label_vector) ** 2)
+    metric.update(loss=loss)
 
 
 if __name__ == "__main__":
@@ -123,8 +122,8 @@ if __name__ == "__main__":
 
     # batch
     batch_size = 32
-    input_parameter_batches = generate_batches(input_phase, batch_size)
-    label_vector_batches = generate_batches(label_sin_vector, batch_size)
+    input_parameter_minibatches = generate_batches(input_phase, batch_size)
+    label_vector_minibatches = generate_batches(label_sin_vector, batch_size)
 
     # MLP model
     model = MLP(rngs=nnx.Rngs(0))
@@ -133,36 +132,42 @@ if __name__ == "__main__":
     output_vector = model(input_phase[0])
     print(input_phase[0].shape, "->", output_vector.shape)
     # batch input parameter
-    output_vector = model(input_parameter_batches[0])
-    print(input_parameter_batches[0].shape, "->", output_vector.shape)
+    output_vector = model(input_parameter_minibatches[0])
+    print(input_parameter_minibatches[0].shape, "->", output_vector.shape)
 
     # optimizer
     learning_rate = 1e-3
     momentum = 0.9
     optimizer = nnx.Optimizer(model, optax.adamw(learning_rate, momentum))
-    metrics = nnx.MultiMetric(
-        accuracy=nnx.metrics.Accuracy(), loss=nnx.metrics.Average("loss")
-    )
+
+    # defines metrics
+    metrics = nnx.MultiMetric(loss=nnx.metrics.Average("loss"))
 
     # training
     batch_training = True
     # batch_training= False
 
-    import time
-
     start = time.time()
     if batch_training:
         print("batch training")
-        for i in tqdm.trange(1000):
+        nepoch = 1000
+        for i in tqdm.trange(nepoch):
             train_step(model, optimizer, metrics, input_phase, label_sin_vector)
 
     else:
         print("minibatch training")
-        for i in tqdm.trange(100):
-            for istep, batch_input_parameter in enumerate(input_parameter_batches):
-                batch_label_vector = label_vector_batches[istep]
+        nepoch = 100
+        for i in tqdm.trange(nepoch):
+            for istep, minibatch_input_parameter in enumerate(
+                input_parameter_minibatches
+            ):
+                minibatch_label_vector = label_vector_minibatches[istep]
                 train_step(
-                    model, optimizer, metrics, batch_input_parameter, batch_label_vector
+                    model,
+                    optimizer,
+                    metrics,
+                    minibatch_input_parameter,
+                    minibatch_label_vector,
                 )
 
     print("elapsed time:", time.time() - start)
