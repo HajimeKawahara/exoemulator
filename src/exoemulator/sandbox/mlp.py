@@ -151,13 +151,15 @@ if __name__ == "__main__":
     if batch_training:
         print("batch training")
         nepoch = 1000
-        for i in tqdm.trange(nepoch):
-            train_step(model, optimizer, metrics, input_phase, label_sin_vector)
-
     else:
         print("minibatch training")
         nepoch = 100
-        for i in tqdm.trange(nepoch):
+    
+    for iepoch in tqdm.trange(nepoch):
+        #training
+        if batch_training:
+            train_step(model, optimizer, metrics, input_phase, label_sin_vector)
+        else:
             for istep, minibatch_input_parameter in enumerate(
                 input_parameter_minibatches
             ):
@@ -169,6 +171,8 @@ if __name__ == "__main__":
                     minibatch_input_parameter,
                     minibatch_label_vector,
                 )
+        # evaluation
+        
 
     print("elapsed time:", time.time() - start)
     # single input parameter
