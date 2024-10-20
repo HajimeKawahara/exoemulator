@@ -127,7 +127,8 @@ if __name__ == "__main__":
 
     # MLP model
     model = MLP(rngs=nnx.Rngs(0))
-
+    nnx.display(model)
+    
     # single input parameter
     output_vector = model(input_phase[0])
     print(input_phase[0].shape, "->", output_vector.shape)
