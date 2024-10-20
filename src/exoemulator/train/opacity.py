@@ -4,13 +4,13 @@
 
 """
 
+from exoemulator.utils.checkpackage import check_installed
+
 
 class OptExoJAX:
 
     def __init__(self):
-        from exoemulator.utils.checkpackage import check_installed
         check_installed("exojax")
-
 
 
 if __name__ == "__main__":
