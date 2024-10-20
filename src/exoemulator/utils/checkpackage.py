@@ -5,5 +5,7 @@ def check_installed(package_name):
 
     if package_name in installed_packages:
         print(f"{package_name} is installed")
+        return True
     else:
-        raise ValueError(f"{package_name} is not installed")
+        print(f"{package_name} is not installed")
+        return False
