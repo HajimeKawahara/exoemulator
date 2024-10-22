@@ -1,5 +1,6 @@
 from exoemulator.utils.checkpackage import check_installed
 from exoemulator.train.opacity import OptExoJAX
+import numpy as np
 
 
 def test_OptExoJAX():
@@ -18,12 +19,20 @@ def test_OptExoJAX_opa_premodit():
         mdb = mock_mdbExomol()
         opa = OpaPremodit(mdb, nu_grid, auto_trange=[490.0, 510.0])
         opt = OptExoJAX(opa=opa)
+        nsample = 10
+        tarr, parr, xs = opt.generate_batch(
+            trange=[490.0, 510.0], prange=[1.0e-3, 1.0e3], nsample=nsample, method="lhs"
+        )
+        tarr2, parr2, xs2 = opt.generate_batch(
+            trange=[490.0, 510.0], prange=[1.0e-3, 1.0e3], nsample=nsample, method="lhs"
+        )
 
-        assert opt.opa.method == "premodit"
+        assert np.all(tarr != tarr2) and tarr.shape == (nsample,)
+        assert np.all(parr != parr2) and parr.shape == (nsample,)
+        assert np.all(xs != xs2) and xs.shape == (nsample, len(nu_grid))
+
     else:
         pass
-
-
 
 
 if __name__ == "__main__":
