@@ -3,4 +3,4 @@ emulates something exoplanets
 
 
 - opt: Opacity training class
-- nem:  Neuralnet Emulator Model
+- emu: Emulator model class 

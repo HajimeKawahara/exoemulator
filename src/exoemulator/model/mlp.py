@@ -6,7 +6,7 @@ import tqdm
 import optax
 import time
 
-class NemMlp(nnx.Module):
+class EmuMlp(nnx.Module):
     """simple MLP neuralnet emulator model 
 
     Args:

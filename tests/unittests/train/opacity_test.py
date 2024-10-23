@@ -1,7 +1,8 @@
 from exoemulator.utils.checkpackage import check_installed
 from exoemulator.train.opacity import OptExoJAX
+from exoemulator.model.mlp import EmuMlp
 import numpy as np
-
+from flax import nnx
 
 def test_OptExoJAX():
     opt = OptExoJAX()
@@ -18,7 +19,8 @@ def test_OptExoJAX_opa_premodit():
         nu_grid, wav, res = mock_wavenumber_grid()
         mdb = mock_mdbExomol()
         opa = OpaPremodit(mdb, nu_grid, auto_trange=[490.0, 510.0])
-        opt = OptExoJAX(opa=opa)
+        emu = EmuMlp(rngs=nnx.Rngs(0))
+        opt = OptExoJAX(opa=opa, emu=emu)
         nsample = 10
         tarr, parr, xs = opt.generate_batch(
             trange=[490.0, 510.0], prange=[1.0e-3, 1.0e3], nsample=nsample, method="lhs"
