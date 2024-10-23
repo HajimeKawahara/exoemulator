@@ -11,7 +11,7 @@ from functools import partial
 from flax import nnx
 from flax.nnx import jit
 import numpy as np
-
+import jax.numpy as jnp
 
 class OptExoJAX:
     """Opacity Training with ExoJAX"""
@@ -59,7 +59,7 @@ class OptExoJAX:
         if method == "lhs":
             # tarr is linear, parr is log
             samples = latin_hypercube_sampling(trange, np.log10(prange), nsample)
-            return samples, self.opa.xsmatrix(samples[:, 0], 10 ** (samples[:, 1]))
+            return samples, jnp.log10(self.opa.xsmatrix(samples[:, 0], 10 ** (samples[:, 1])))
 
         else:
             raise NotImplementedError(f"Method {method} is not implemented")
