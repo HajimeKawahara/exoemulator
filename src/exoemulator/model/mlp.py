@@ -14,10 +14,9 @@ class EmuMlp(nnx.Module):
 
     """
 
-    def __init__(self, *, rngs: nnx.Rngs):
-        grid_length = 1024
+    def __init__(self, *, rngs: nnx.Rngs, grid_length: int):
         nneuron = 128
-        self.dense_entrance = nnx.Linear(in_features=1, out_features=nneuron, rngs=rngs)
+        self.dense_entrance = nnx.Linear(in_features=2, out_features=nneuron, rngs=rngs)
         self.dense = nnx.Linear(in_features=nneuron, out_features=nneuron, rngs=rngs)
         self.dense_out = nnx.Linear(
             in_features=nneuron, out_features=grid_length, rngs=rngs

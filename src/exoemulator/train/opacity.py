@@ -19,8 +19,7 @@ class OptExoJAX:
     def __init__(self, opa=None, emu=None):
         check_installed("exojax")
         self.set_opa(opa)
-        self.set_emulator(emu)
-
+        
     def set_opa(self, opa):
         """sets opa (opacity class in ExoJAX)
 
@@ -37,19 +36,7 @@ class OptExoJAX:
             print("opa (ExoJAX opacity class) in opt: ", opa.__class__.__name__)
             self.opa = opa
 
-    def set_emulator(self, emu):
-        """sets emulator model
-
-        Args:
-            emu : emulator model
-
-        """
-        if emu is None:
-            print("emu (emulator model) has not been given yet")
-        else:
-            print("emu (emulator model) in opt: ", emu.__class__.__name__)
-            self.emu = emu
-
+    
     def generate_batch(self, trange, prange, nsample, method="lhs"):
         """generates batched samples of temperature, pressure, and cross section
 
@@ -81,13 +68,14 @@ class OptExoJAX:
     @partial(jit, static_argnums=(0,))
     def train_step(
         self,
+        model: nnx.Module,
         optimizer: nnx.Optimizer,
         metric: nnx.MultiMetric,
         input_parameter,
         label_vector,
     ):
         grad_fn = nnx.value_and_grad(loss_l2, has_aux=True)
-        (loss, output_vector), grads = grad_fn(self.emu, input_parameter, label_vector)
+        (loss, output_vector), grads = grad_fn(model, input_parameter, label_vector)
         metric.update(loss=loss)
         optimizer.update(grads)
 

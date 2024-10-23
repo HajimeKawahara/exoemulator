@@ -20,8 +20,7 @@ def test_OptExoJAX_opa_premodit():
         nu_grid, wav, res = mock_wavenumber_grid()
         mdb = mock_mdbExomol()
         opa = OpaPremodit(mdb, nu_grid, auto_trange=[490.0, 510.0])
-        emu = EmuMlp(rngs=nnx.Rngs(0))
-        opt = OptExoJAX(opa=opa, emu=emu)
+        opt = OptExoJAX(opa=opa)
         nsample = 10
         input_parameters, xs = opt.generate_batch(
             trange=[490.0, 510.0], prange=[1.0e-3, 1.0e3], nsample=nsample, method="lhs"
