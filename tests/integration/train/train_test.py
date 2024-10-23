@@ -1,5 +1,5 @@
 from exoemulator.train.opacity import OptExoJAX
-from exoemulator.model.mlp import NemMlp
+from exoemulator.model.mlp import EmuMlp
 from flax import nnx
 import numpy as np
 
@@ -18,15 +18,25 @@ def test_training():
     nu_grid, wav, res = mock_wavenumber_grid()
     mdb = mock_mdbExomol()
     opa = OpaPremodit(mdb, nu_grid, auto_trange=trange)
-    opt = OptExoJAX(opa=opa)
-    nem = NemMlp(rngs=nnx.Rngs(0))
+    emu = EmuMlp(rngs=nnx.Rngs(0))
+
+    opt = OptExoJAX(opa=opa, emu=emu)
     
+    # optimizer
+    learning_rate = 1e-3
+    momentum = 0.9
+    optimizer = nnx.Optimizer(model, optax.adamw(learning_rate, momentum))
+
+    # defines metrics
+    metrics = nnx.MultiMetric(loss=nnx.metrics.Average("loss"))
+
     nsample = 100
     
-    tarr, parr, xs = opt.generate_batch(
+    input_paramters, xs = opt.generate_batch(
         trange=trange, prange=prange, nsample=nsample, method="lhs"
     )
-    opt.train()
+    #opt.train_step(emu,optimizer,metrics,)
+                    
 
 if __name__ == "__main__":
     test_training()

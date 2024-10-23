@@ -6,6 +6,10 @@
 
 from exoemulator.utils.checkpackage import check_installed
 from exoemulator.train.sampling import latin_hypercube_sampling
+from exoemulator.model.loss import loss_l2
+from functools import partial
+from flax import nnx
+from flax.nnx import jit
 import numpy as np
 
 
@@ -47,14 +51,45 @@ class OptExoJAX:
             self.emu = emu
 
     def generate_batch(self, trange, prange, nsample, method="lhs"):
+        """generates batched samples of temperature, pressure, and cross section
+
+        Args:
+            trange (tuple or list): A tuple containing the minimum and maximum temperature range.
+            prange (tuple or list): A tuple containing the minimum and maximum pressure range.
+            nsample (int): The number of samples to generate.
+            method (str, optional): The sampling method to use. Defaults to "lhs".
+
+        Notes:
+            "lhs" means Latin Hypercube Sampling.
+
+        Raises:
+            NotImplementedError: If the specified method is not implemented.
+
+        Returns:
+            tuple: A tuple containing arrays of (temperature, pressure), and cross section matrix.
+        """
+
         if method == "lhs":
             # tarr is linear, parr is log
             samples = latin_hypercube_sampling(trange, np.log10(prange), nsample)
-            tarr = samples[:, 0]
-            parr = 10 ** (samples[:, 1])
+            return samples, self.opa.xsmatrix(samples[:, 0], 10 ** (samples[:, 1]))
+
         else:
             raise NotImplementedError(f"Method {method} is not implemented")
-        return tarr, parr, self.opa.xsmatrix(tarr, parr)
+
+    # @nnx.jit
+    @partial(jit, static_argnums=(0,))
+    def train_step(
+        self,
+        optimizer: nnx.Optimizer,
+        metric: nnx.MultiMetric,
+        input_parameter,
+        label_vector,
+    ):
+        grad_fn = nnx.value_and_grad(loss_l2, has_aux=True)
+        (loss, output_vector), grads = grad_fn(self.emu, input_parameter, label_vector)
+        metric.update(loss=loss)
+        optimizer.update(grads)
 
 
 if __name__ == "__main__":

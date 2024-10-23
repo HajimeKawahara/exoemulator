@@ -4,6 +4,7 @@ from exoemulator.model.mlp import EmuMlp
 import numpy as np
 from flax import nnx
 
+
 def test_OptExoJAX():
     opt = OptExoJAX()
 
@@ -22,15 +23,19 @@ def test_OptExoJAX_opa_premodit():
         emu = EmuMlp(rngs=nnx.Rngs(0))
         opt = OptExoJAX(opa=opa, emu=emu)
         nsample = 10
-        tarr, parr, xs = opt.generate_batch(
+        input_parameters, xs = opt.generate_batch(
             trange=[490.0, 510.0], prange=[1.0e-3, 1.0e3], nsample=nsample, method="lhs"
         )
-        tarr2, parr2, xs2 = opt.generate_batch(
+        input_parameters2, xs2 = opt.generate_batch(
             trange=[490.0, 510.0], prange=[1.0e-3, 1.0e3], nsample=nsample, method="lhs"
         )
 
-        assert np.all(tarr != tarr2) and tarr.shape == (nsample,)
-        assert np.all(parr != parr2) and parr.shape == (nsample,)
+        assert np.all(
+            input_parameters != input_parameters2
+        ) and input_parameters.shape == (
+            nsample,
+            2,
+        )
         assert np.all(xs != xs2) and xs.shape == (nsample, len(nu_grid))
 
     else:
