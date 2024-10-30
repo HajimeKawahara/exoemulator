@@ -2,3 +2,5 @@ jax
 jaxlib
 flax
 tqdm
+matplotlib
+pandas

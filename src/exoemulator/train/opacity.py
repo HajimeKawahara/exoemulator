@@ -55,14 +55,17 @@ class OptExoJAX:
         Returns:
             tuple: A tuple containing arrays of (temperature, pressure), and cross section matrix.
         """
-
+        offset = 22.0
+        factor = 0.3
         if method == "lhs":
             # tarr is linear, parr is log
             samples = latin_hypercube_sampling(trange, np.log10(prange), nsample)
-            return samples, jnp.log10(self.opa.xsmatrix(samples[:, 0], 10 ** (samples[:, 1])))
+            return samples, factor*(jnp.log10(self.opa.xsmatrix(samples[:, 0], 10 ** (samples[:, 1]))) + offset)
 
         else:
             raise NotImplementedError(f"Method {method} is not implemented")
+
+    
 
     # @nnx.jit
     @partial(jit, static_argnums=(0,))
@@ -78,7 +81,18 @@ class OptExoJAX:
         (loss, output_vector), grads = grad_fn(model, input_parameter, label_vector)
         metric.update(loss=loss)
         optimizer.update(grads)
-
+        return loss
+    
+    @partial(jit, static_argnums=(0,))
+    def evaluate_step(
+        self,
+        model: nnx.Module,
+        input_parameter,
+        label_vector,
+    ):
+        grad_fn = nnx.value_and_grad(loss_l2, has_aux=True)
+        (loss, output_vector), grads = grad_fn(model, input_parameter, label_vector)
+        return loss
 
 if __name__ == "__main__":
     opt = OptExoJAX()
