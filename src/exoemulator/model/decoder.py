@@ -1,10 +1,4 @@
-import jax
-import jax.numpy as jnp
-from jax import random
 from flax import nnx
-import tqdm
-import optax
-import time
 
 
 class EmuMlpDecoder(nnx.Module):

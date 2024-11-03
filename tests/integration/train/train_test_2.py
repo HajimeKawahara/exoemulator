@@ -38,22 +38,24 @@ def test_training():
     # defines metrics
     metrics = nnx.MultiMetric(loss=nnx.metrics.Average("loss"))
     nsample = 100  # default 300
-    niter = 1500000
-    #niter = 10000
-    tag = "Pat4_n" + str(nsample) + "niter" + str(niter)
-    outfile = "mlp_emulator_" + tag + ".png"
-    print("outfile:", outfile)
-
+    #niter = 1000
+    
     lossarr = []
     testlossarr = []
 
     # optimizer
-    N_lr = 3 
-    learning_rate = 1e-3
+    niter = 1000000
     momentum = 0.9
-    
+    learning_rate_arr = np.logspace(-4, -6, 5)
+    N_lr = len(learning_rate_arr)
+
+    tag = "decoder_"+str(N_lr)+"lr"
+    outfile = "mlp_emulator_" + tag + ".png"
+    print("outfile:", outfile)
+
+
     for j in range(N_lr):
-        learning_rate = learning_rate/10.0 #learning rate scheduling (step decay)
+        learning_rate = learning_rate_arr[j] #learning rate scheduling (step decay)
         optimizer = nnx.Optimizer(emulator_model, optax.adamw(learning_rate, momentum))
         description = "learning rate: "+str(learning_rate)+":"+str(j+1)+"/"+str(N_lr)
         for i in tqdm.tqdm(range(niter),desc=description):
@@ -78,12 +80,6 @@ def test_training():
 
     # plot loss
     np.savez("loss"+tag+".npz", lossarr=lossarr, testlossarr=testlossarr)
-    plt.plot(lossarr[10:], label="train")
-    plt.plot(testlossarr[10:], label="test")
-    plt.yscale("log")
-    plt.xscale("log")
-    plt.legend()
-    plt.savefig("loss"+tag+".png")
 
     # test prediction
     input_par = jnp.array([729.0, jnp.log10(3.0e-1)])
