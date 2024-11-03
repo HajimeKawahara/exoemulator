@@ -66,7 +66,11 @@ def test_training():
             testloss = opt.evaluate_step(emulator_model, input_parameters, logxs)
             lossarr.append(loss)
             testlossarr.append(testloss)
-            
+
+    optimizer = nnx.Optimizer(emulator_model, optax.adamw(learning_rate, momentum))
+
+
+
     # plot loss
     np.savez("loss"+tag+".npz", lossarr=lossarr, testlossarr=testlossarr)
     plt.plot(lossarr[10:], label="train")
@@ -102,11 +106,7 @@ def test_training():
     nnx.display(state)
     checkpointer = ocp.StandardCheckpointer()
     checkpointer.save(ckpt_dir / "state", state)
-
-    # need to wait for the file to be written
-    from exoemulator.utils.sleep import wait_for_saving
-
-    wait_for_saving(waitsec=3)
+    checkpointer.wait_until_finished()
 
 
 def xs_prediction(output_vector, offset, factor):

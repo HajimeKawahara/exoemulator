@@ -44,7 +44,8 @@ def test_training():
     testlossarr = []
 
     # optimizer
-    niter = 1000000
+    #niter = 1000000
+    niter = 1000
     momentum = 0.9
     learning_rate_arr = np.logspace(-4, -6, 5)
     N_lr = len(learning_rate_arr)
@@ -107,11 +108,7 @@ def test_training():
     nnx.display(state)
     checkpointer = ocp.StandardCheckpointer()
     checkpointer.save(ckpt_dir / "state", state)
-
-    # need to wait for the file to be written
-    from exoemulator.utils.sleep import wait_for_saving
-
-    wait_for_saving(waitsec=3)
+    checkpointer.wait_until_finished()
 
 
 def xs_prediction(output_vector, offset, factor):
