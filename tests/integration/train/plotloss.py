@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-#tag = "decoder_5lr"
-tag = "Pattmp_n100niter1500000"
+tag = "decoder_3lrc"
+#tag = "Pattmp_n100niter1500000"
 
 arr = np.load("loss"+tag+".npz")
 lossarr = arr["lossarr"]

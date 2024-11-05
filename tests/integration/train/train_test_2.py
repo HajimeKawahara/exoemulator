@@ -1,6 +1,4 @@
-import test
 from exoemulator.train.opacity import OptExoJAX
-from exoemulator.model.mlp import EmuMlp
 from exoemulator.model.decoder import EmuMlpDecoder
 
 from flax import nnx
@@ -34,32 +32,33 @@ def test_training():
     emulator_model = EmuMlpDecoder(rngs=nnx.Rngs(0), grid_length=len(nu_grid))
     opt = OptExoJAX(opa=opa)
 
-    
     # defines metrics
     metrics = nnx.MultiMetric(loss=nnx.metrics.Average("loss"))
     nsample = 100  # default 300
-    #niter = 1000
-    
+    # niter = 1000
+
     lossarr = []
     testlossarr = []
 
     # optimizer
-    #niter = 1000000
-    niter = 1000
+    # niter = 1000000
+    # niter = 1000
     momentum = 0.9
-    learning_rate_arr = np.logspace(-4, -6, 5)
+    learning_rate_arr = np.logspace(-4, -6, 3)
+    niter_arr = [2000000, 2000000, 2000000]
     N_lr = len(learning_rate_arr)
 
-    tag = "decoder_"+str(N_lr)+"lr"
+    tag = "decoder_" + str(N_lr) + "lrc"
     outfile = "mlp_emulator_" + tag + ".png"
     print("outfile:", outfile)
 
-
     for j in range(N_lr):
-        learning_rate = learning_rate_arr[j] #learning rate scheduling (step decay)
+        learning_rate = learning_rate_arr[j]  # learning rate scheduling (step decay)
         optimizer = nnx.Optimizer(emulator_model, optax.adamw(learning_rate, momentum))
-        description = "learning rate: "+str(learning_rate)+":"+str(j+1)+"/"+str(N_lr)
-        for i in tqdm.tqdm(range(niter),desc=description):
+        description = (
+            "learning rate: " + str(learning_rate) + ":" + str(j + 1) + "/" + str(N_lr)
+        )
+        for i in tqdm.tqdm(range(niter_arr[j]), desc=description):
             if np.mod(i, 20) == 0:
                 input_parameters, logxs = opt.generate_batch(
                     trange=trange, prange=prange, nsample=nsample, method="lhs"
@@ -74,13 +73,9 @@ def test_training():
                 testloss = opt.evaluate_step(emulator_model, input_parameters, logxs)
                 lossarr.append(loss)
                 testlossarr.append(testloss)
-        
-        
-    
-    
 
     # plot loss
-    np.savez("loss"+tag+".npz", lossarr=lossarr, testlossarr=testlossarr)
+    np.savez("loss" + tag + ".npz", lossarr=lossarr, testlossarr=testlossarr)
 
     # test prediction
     input_par = jnp.array([729.0, jnp.log10(3.0e-1)])
@@ -102,7 +97,7 @@ def test_training():
     ax2.set_xlabel("wavenumber (cm-1)")
     ax2.set_ylabel("relative error")
     plt.savefig(outfile)  # R: lerning rate 1e-4
-    plt.show()
+    #    plt.show()
 
     _, state = nnx.split(emulator_model)
     nnx.display(state)

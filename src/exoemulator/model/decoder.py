@@ -10,6 +10,7 @@ class EmuMlpDecoder(nnx.Module):
     """
 
     def __init__(self, *, rngs: nnx.Rngs, grid_length: int):
+    #def __init__(self, rngs: nnx.Rngs, grid_length: int):
         self.dense_entrance = nnx.Linear(in_features=2, out_features=16, rngs=rngs)
         self.dense_1 = nnx.Linear(in_features=16, out_features=32, rngs=rngs)
         self.dense_2 = nnx.Linear(in_features=32, out_features=256, rngs=rngs)
