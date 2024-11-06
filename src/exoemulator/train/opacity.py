@@ -15,7 +15,7 @@ import jax.numpy as jnp
 import tqdm
 import optax
 import orbax.checkpoint as ocp
-
+import pathlib
 
 class OptExoJAX:
     """Opacity Training with ExoJAX"""
@@ -72,6 +72,14 @@ class OptExoJAX:
             raise NotImplementedError(f"Method {method} is not implemented")
 
     def xs_prediction(self, output_vector):
+        """ Predicts cross section from the output vector
+        
+        Args:
+            output_vector (array): The output vector from the emulator model.
+
+        Returns:
+            array: The predicted cross section.
+        """
         return 10 ** (output_vector / self.factor - self.offset)
 
     @partial(jit, static_argnums=(0,))
@@ -83,6 +91,17 @@ class OptExoJAX:
         input_parameter,
         label_vector,
     ):
+        """ Trains the model for one step.
+        Args:
+            model (nnx.Module): The neural network model to be trained.
+            optimizer (nnx.Optimizer): The optimizer used to update the model parameters.
+            metric (nnx.MultiMetric): The metric object used to track training performance.
+            input_parameter: The input data for the model (T,P).
+            label_vector: The ground truth label vector (reference cross section) corresponding to the input data.
+
+        Returns:
+            float: The computed loss value for the current training step.
+        """
         grad_fn = nnx.value_and_grad(loss_l2, has_aux=True)
         (loss, _), grads = grad_fn(model, input_parameter, label_vector)
         metric.update(loss=loss)
@@ -96,6 +115,15 @@ class OptExoJAX:
         input_parameter,
         label_vector,
     ):
+        """ Evaluates the model on the test data.
+        Args:
+            model (nnx.Module): The neural network model to be evaluated.
+            input_parameter (Any): The input data for the model.
+            label_vector (Any): The true labels corresponding to the input data.
+            
+        Returns:
+            float: The loss value computed for the given input and label.
+        """
         grad_fn = nnx.value_and_grad(loss_l2, has_aux=True)
         (loss, _), _ = grad_fn(model, input_parameter, label_vector)
         return loss
@@ -113,6 +141,20 @@ class OptExoJAX:
         n_single_learn=20,
         metric_save_interval=100,
     ):
+        """ Trains the model using the given parameters.
+        
+        Args:
+            model (nnx.Module): The neural network model to be trained.
+            metrics (nnx.MultiMetric): Metrics to evaluate the model's performance.
+            trange (tuple): Range of temperature values for training data generation.
+            prange (tuple): Range of pressure values for training data generation.
+            learning_rate_arr (list): List of learning rates for each training phase.
+            niter_arr (list): List of iteration counts for each training phase.
+            nsample_minibatch (int, optional): Number of samples in each minibatch. Defaults to 100.
+            adamw_momentum (float, optional): Momentum parameter for the AdamW optimizer. Defaults to 0.9.
+            n_single_learn (int, optional): Number of iterations before generating a new batch of data. Defaults to 20.
+            metric_save_interval (int, optional): Interval for saving metrics during training. Defaults to 100.
+        """
 
         self.lossarr = []
         self.testlossarr = []
@@ -125,7 +167,7 @@ class OptExoJAX:
                 j
             ]  # learning rate scheduling (step decay)
             optimizer = nnx.Optimizer(model, optax.adamw(learning_rate, adamw_momentum))
-            description = self.desc_for_tqdm(N_lr, j, learning_rate)
+            description = self._desc_for_tqdm(N_lr, j, learning_rate)
             for i in tqdm.tqdm(range(niter_arr[j]), desc=description):
                 if np.mod(i, n_single_learn) == 0:
                     input_parameters, logxs = self.generate_batch(
@@ -148,14 +190,21 @@ class OptExoJAX:
                     self.lossarr.append(loss)
                     self.testlossarr.append(testloss)
 
-    def desc_for_tqdm(self, N_lr, j, learning_rate):
+    def _desc_for_tqdm(self, N_lr, j, learning_rate):
+        """ Generates a description for the tqdm progress bar."""
         description = (
             "learning rate: " + str(learning_rate) + ":" + str(j + 1) + "/" + str(N_lr)
         )
 
         return description
 
-    def save_state(self, ckpt_dir, state):
+    def save_state(self, ckpt_dir: pathlib.Path, state):
+        """save the state of the model
+        
+        Args:
+            ckpt_dir: checkpoint directory
+            state: state
+        """
         metadata = {
             "grid_length": len(self.opa.nu_grid),
             "offset": self.offset,
@@ -175,7 +224,16 @@ class OptExoJAX:
             ),
         )
 
-    def restore_state(self, model, ckpt_dir):
+    def restore_state(self, model, ckpt_dir: pathlib.Path):
+        """restore the state of the model        
+        
+        Args:
+            model: exoemulator model
+            ckpt_dir (pathlib.Path): checkpoint directory
+
+        Returns:
+            graphdef, restored
+        """
         checkpointer = ocp.Checkpointer(
             ocp.CompositeCheckpointHandler("state", "nu_grid", "metadata")
         )
@@ -212,7 +270,16 @@ class OptExoJAX:
 
         return graphdef, restored
 
-    def restore_model(self, model, ckpt_dir):
+    def restore_model(self, model, ckpt_dir: pathlib.Path):
+        """restore the model
+        
+        Args:
+            model: exoemulator model
+            ckpt_dir (pathlib.Path): checkpoint directory
+
+        Returns:
+            emulator_model
+        """
         graphdef, restored = self.restore_state(model, ckpt_dir)
         self.nu_grid = restored.nu_grid
 

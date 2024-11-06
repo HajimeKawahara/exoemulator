@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 
 import orbax.checkpoint as ocp
 
-# ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/checkpoints")
-ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/checkpoints_tmp")
+ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/checkpoints")
+#ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/checkpoints_tmp")
 
 
 def test_training():
