@@ -26,16 +26,12 @@ def test_training():
     nu_grid, wav, res = mock_wavenumber_grid()
     print(nu_grid.shape)  # 20000
     mdb = mock_mdbExomol()
-    opa = OpaPremodit(mdb, nu_grid, auto_trange=trange)
-    # emulator_model = EmuMlp(rngs=nnx.Rngs(0), grid_length=len(nu_grid))
-    emu_model = opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=len(nu_grid))
+    opt = OptExoJAX(opa=OpaPremodit(mdb, nu_grid, auto_trange=trange))
+
+    model = opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=len(nu_grid))
     metrics = nnx.MultiMetric(loss=nnx.metrics.Average("loss"))
 
-    opt = OptExoJAX(opa=opa, emu=emu_model, metrics=metrics)
-
-    # defines metrics
-
-    # optimizer
+    # leanirng rate and niter
     learning_rate_arr = np.logspace(-4, -6, 3)
     # niter_arr = [2000000, 2000000, 2000000]
     niter_arr = [1000, 1000, 1000]
@@ -44,14 +40,14 @@ def test_training():
     outfile = "mlp_emulator_" + tag + ".png"
     print("outfile:", outfile)
 
-    opt.train(trange, prange, learning_rate_arr, niter_arr)
+    opt.train(model, metrics, trange, prange, learning_rate_arr, niter_arr)
 
     # save loss (use plotloss.py for plotting)
     np.savez("loss" + tag + ".npz", lossarr=opt.lossarr, testlossarr=opt.testlossarr)
 
     # test prediction
     input_par = jnp.array([729.0, jnp.log10(3.0e-1)])
-    output_vector = emu_model(input_par)
+    output_vector = model(input_par)
     xs_ref = opt.opa.xsvector(input_par[0], 10 ** input_par[1])
     xs_pred = opt.xs_prediction(output_vector)
 
@@ -69,7 +65,7 @@ def test_training():
     plt.savefig(outfile)  # R: lerning rate 1e-4
     #    plt.show()
 
-    _, state = nnx.split(emu_model)
+    _, state = nnx.split(model)
     nnx.display(state)
     checkpointer = ocp.StandardCheckpointer()
     checkpointer.save(ckpt_dir / "state", state)

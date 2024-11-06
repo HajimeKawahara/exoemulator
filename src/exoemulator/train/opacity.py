@@ -19,12 +19,11 @@ import optax
 class OptExoJAX:
     """Opacity Training with ExoJAX"""
 
-    def __init__(self, opa=None, emu=None):
+    def __init__(self, opa=None):
         check_installed("exojax")
         self.set_opa(opa)
         self.offset = 22.0
         self.factor = 0.3
-        
 
     def set_opa(self, opa):
         """sets opa (opacity class in ExoJAX)
@@ -74,7 +73,6 @@ class OptExoJAX:
     def xs_prediction(self, output_vector):
         return 10 ** (output_vector / self.factor - self.offset)
 
-
     @partial(jit, static_argnums=(0,))
     def train_step(
         self,
@@ -85,7 +83,7 @@ class OptExoJAX:
         label_vector,
     ):
         grad_fn = nnx.value_and_grad(loss_l2, has_aux=True)
-        (loss, output_vector), grads = grad_fn(model, input_parameter, label_vector)
+        (loss, _), grads = grad_fn(model, input_parameter, label_vector)
         metric.update(loss=loss)
         optimizer.update(grads)
         return loss
@@ -98,11 +96,13 @@ class OptExoJAX:
         label_vector,
     ):
         grad_fn = nnx.value_and_grad(loss_l2, has_aux=True)
-        (loss, output_vector), grads = grad_fn(model, input_parameter, label_vector)
+        (loss, _), _ = grad_fn(model, input_parameter, label_vector)
         return loss
 
     def train(
         self,
+        model: nnx.Module,
+        metrics: nnx.MultiMetric,
         trange,
         prange,
         learning_rate_arr,
@@ -121,17 +121,8 @@ class OptExoJAX:
             learning_rate = learning_rate_arr[
                 j
             ]  # learning rate scheduling (step decay)
-            optimizer = nnx.Optimizer(
-                self.model, optax.adamw(learning_rate, adamw_momentum)
-            )
-            description = (
-                "learning rate: "
-                + str(learning_rate)
-                + ":"
-                + str(j + 1)
-                + "/"
-                + str(N_lr)
-            )
+            optimizer = nnx.Optimizer(model, optax.adamw(learning_rate, adamw_momentum))
+            description = self.desc_for_tqdm(N_lr, j, learning_rate)
             for i in tqdm.tqdm(range(niter_arr[j]), desc=description):
                 if np.mod(i, n_single_learn) == 0:
                     input_parameters, logxs = self.generate_batch(
@@ -141,7 +132,7 @@ class OptExoJAX:
                         method="lhs",
                     )
                 loss = self.train_step(
-                    self.model, optimizer, self.metrics, input_parameters, logxs
+                    model, optimizer, metrics, input_parameters, logxs
                 )
                 if np.mod(i, metric_save_interval) == 0:
                     input_parameters, logxs = self.generate_batch(
@@ -150,11 +141,16 @@ class OptExoJAX:
                         nsample=nsample_minibatch,
                         method="lhs",
                     )
-                    testloss = self.evaluate_step(
-                        self.model, input_parameters, logxs
-                    )
+                    testloss = self.evaluate_step(model, input_parameters, logxs)
                     self.lossarr.append(loss)
                     self.testlossarr.append(testloss)
+
+    def desc_for_tqdm(self, N_lr, j, learning_rate):
+        description = (
+            "learning rate: " + str(learning_rate) + ":" + str(j + 1) + "/" + str(N_lr)
+        )
+
+        return description
 
 
 if __name__ == "__main__":
