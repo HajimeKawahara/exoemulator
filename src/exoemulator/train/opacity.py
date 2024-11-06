@@ -187,9 +187,11 @@ class OptExoJAX:
                 metadata=ocp.args.JsonRestore(),
             ),
         )
-        grid_length = restored.metadata["grid_length"]
+        # generate an abstract model
         abstract_model = nnx.eval_shape(
-            lambda: model(rngs=nnx.Rngs(0), grid_length=grid_length)
+            lambda: model(
+                rngs=nnx.Rngs(0), grid_length=restored.metadata["grid_length"]
+            )
         )
         graphdef, abstract_state = nnx.split(abstract_model)
 
@@ -209,6 +211,13 @@ class OptExoJAX:
         self.factor = restored.metadata["factor"]
 
         return graphdef, restored
+
+    def restore_model(self, model, ckpt_dir):
+        graphdef, restored = self.restore_state(model, ckpt_dir)
+        self.nu_grid = restored.nu_grid
+
+        emulator_model = nnx.merge(graphdef, restored.state)
+        return emulator_model
 
 
 if __name__ == "__main__":

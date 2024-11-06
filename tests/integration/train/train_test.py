@@ -33,8 +33,8 @@ def test_training():
 
     # leanirng rate and niter
     learning_rate_arr = np.logspace(-4, -6, 3)
-    # niter_arr = [2000000, 2000000, 2000000]
-    niter_arr = [1000, 1000, 1000]
+    niter_arr = [3000000, 3000000, 3000000]
+    #niter_arr = [1000, 1000, 1000]
 
     tag = "decoder_" + str(len(learning_rate_arr)) + "lrc"
     outfile = "mlp_emulator_" + tag + ".png"
