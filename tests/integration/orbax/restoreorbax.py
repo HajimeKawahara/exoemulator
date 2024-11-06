@@ -31,11 +31,9 @@ ckpt_dir = Path("/home/kawahara/tmp_checkpoints/")
 metadata_store = True
 
 
-
-
 if metadata_store:
-    checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler("state", "metadata"))
-    
+    checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler("state", "nu_grid", "metadata"))
+
     # load metadata only
     restored = checkpointer.restore(
         ckpt_dir / "state",
@@ -46,7 +44,7 @@ if metadata_store:
     print(restored.metadata)
     grid_length = restored.metadata["grid_length"]
     abstract_model = nnx.eval_shape(
-    lambda: opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=grid_length)
+        lambda: opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=grid_length)
     )
     graphdef, abstract_state = nnx.split(abstract_model)
 
@@ -55,22 +53,25 @@ if metadata_store:
         ckpt_dir / "state",
         args=ocp.args.Composite(
             state=ocp.args.StandardRestore(abstract_state),
+            nu_grid=ocp.args.ArrayRestore(),
             metadata=ocp.args.JsonRestore(),
         ),
     )
     state_restored = restored.state
     metadata = restored.metadata
+    nu_grid = restored.nu_grid
     print(metadata)
+    print(nu_grid)
 
 else:
     abstract_model = nnx.eval_shape(
-    lambda: opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=20000)
+        lambda: opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=20000)
     )
     graphdef, abstract_state = nnx.split(abstract_model)
     checkpointer = ocp.StandardCheckpointer()
     state_restored = checkpointer.restore(ckpt_dir / "state", abstract_state)
 
-#print(state_restored)
+# print(state_restored)
 
 # jax.tree.map(np.testing.assert_array_equal, state, state_restored)
 # print('NNX State restored: ')

@@ -7,7 +7,7 @@ import numpy as np
 ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/tmp_checkpoints/")
 
 
-class EmuMlpDecoder(nnx.Module):
+class decoder(nnx.Module):
     def __init__(self, *, rngs: nnx.Rngs, grid_length: int):
         # def __init__(self, rngs: nnx.Rngs, grid_length: int):
         self.dense_entrance = nnx.Linear(in_features=2, out_features=16, rngs=rngs)
@@ -39,7 +39,7 @@ class TwoLayerMLP(nnx.Module):
 # Instantiate the model and show we can run it.
 # model = TwoLayerMLP(4, rngs=nnx.Rngs(0))
 grid_length = 20000
-model = EmuMlpDecoder(rngs=nnx.Rngs(0), grid_length=grid_length)
+model = decoder(rngs=nnx.Rngs(0), grid_length=grid_length)
 # x = jax.random.normal(jax.random.key(42), (3, 4))
 # assert model(x).shape == (3, 4)
 
@@ -48,15 +48,18 @@ nnx.display(state)
 
 # metadata = None
 metadata = {"grid_length": grid_length}
+nu_grid = jnp.ones(grid_length)
+#nu_grid = np.ones(grid_length)
 
 if metadata is not None:
-    checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler("state", "metadata"))
+    checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler("state", "nu_grid", "metadata"))
     checkpointer.save(
         ckpt_dir / "state",
         args=ocp.args.Composite(
-            state=ocp.args.StandardSave(state), metadata=ocp.args.JsonSave(metadata)
+            state=ocp.args.StandardSave(state), nu_grid=ocp.args.ArraySave(nu_grid), metadata=ocp.args.JsonSave(metadata)
         ),
     )
+    
 else:
     checkpointer = ocp.StandardCheckpointer()
     checkpointer.save(ckpt_dir / "state", state)

@@ -14,6 +14,7 @@ import numpy as np
 import jax.numpy as jnp
 import tqdm
 import optax
+import orbax.checkpoint as ocp
 
 
 class OptExoJAX:
@@ -115,6 +116,8 @@ class OptExoJAX:
 
         self.lossarr = []
         self.testlossarr = []
+        self.trange = trange
+        self.prange = prange
 
         N_lr = len(learning_rate_arr)
         for j in range(N_lr):
@@ -126,8 +129,8 @@ class OptExoJAX:
             for i in tqdm.tqdm(range(niter_arr[j]), desc=description):
                 if np.mod(i, n_single_learn) == 0:
                     input_parameters, logxs = self.generate_batch(
-                        trange=trange,
-                        prange=prange,
+                        trange=self.trange,
+                        prange=self.prange,
                         nsample=nsample_minibatch,
                         method="lhs",
                     )
@@ -136,8 +139,8 @@ class OptExoJAX:
                 )
                 if np.mod(i, metric_save_interval) == 0:
                     input_parameters, logxs = self.generate_batch(
-                        trange=trange,
-                        prange=prange,
+                        trange=self.trange,
+                        prange=self.prange,
                         nsample=nsample_minibatch,
                         method="lhs",
                     )
@@ -151,6 +154,61 @@ class OptExoJAX:
         )
 
         return description
+
+    def save_state(self, ckpt_dir, state):
+        metadata = {
+            "grid_length": len(self.opa.nu_grid),
+            "offset": self.offset,
+            "factor": self.factor,
+            "trange": self.trange,
+            "prange": self.prange,
+        }
+        checkpointer = ocp.Checkpointer(
+            ocp.CompositeCheckpointHandler("state", "nu_grid", "metadata")
+        )
+        checkpointer.save(
+            ckpt_dir / "state",
+            args=ocp.args.Composite(
+                state=ocp.args.StandardSave(state),
+                nu_grid=ocp.args.ArraySave(self.opa.nu_grid),
+                metadata=ocp.args.JsonSave(metadata),
+            ),
+        )
+
+    def restore_state(self, model, ckpt_dir):
+        checkpointer = ocp.Checkpointer(
+            ocp.CompositeCheckpointHandler("state", "nu_grid", "metadata")
+        )
+
+        # load metadata only
+        restored = checkpointer.restore(
+            ckpt_dir / "state",
+            args=ocp.args.Composite(
+                metadata=ocp.args.JsonRestore(),
+            ),
+        )
+        grid_length = restored.metadata["grid_length"]
+        abstract_model = nnx.eval_shape(
+            lambda: model(rngs=nnx.Rngs(0), grid_length=grid_length)
+        )
+        graphdef, abstract_state = nnx.split(abstract_model)
+
+        # restore the state
+        restored = checkpointer.restore(
+            ckpt_dir / "state",
+            args=ocp.args.Composite(
+                state=ocp.args.StandardRestore(abstract_state),
+                nu_grid=ocp.args.ArrayRestore(),
+                metadata=ocp.args.JsonRestore(),
+            ),
+        )
+
+        self.trange = restored.metadata["trange"]
+        self.prange = restored.metadata["prange"]
+        self.offset = restored.metadata["offset"]
+        self.factor = restored.metadata["factor"]
+
+        return graphdef, restored
 
 
 if __name__ == "__main__":

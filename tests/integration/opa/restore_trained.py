@@ -8,32 +8,36 @@ import jax
 from jax import numpy as jnp
 import numpy as np
 from exoemulator.model.decoder import opaemulator_decoder
+from exoemulator.train.opacity import OptExoJAX
 from pathlib import Path
 
-ckpt_dir = Path("/home/kawahara/checkpoints")
-checkpointer = ocp.StandardCheckpointer()
+
+#ckpt_dir = Path("/home/kawahara/checkpoints")
+ckpt_dir = Path("/home/kawahara/checkpoints_tmp")
+#checkpointer = ocp.StandardCheckpointer()
 
 # Restore the checkpoint back to its `nnx.State` structure - need an abstract reference.
-abstract_model = nnx.eval_shape(lambda: opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=20000))
-graphdef, abstract_state = nnx.split(abstract_model)
-nnx.display(abstract_state)
 
-state_restored = checkpointer.restore(ckpt_dir / 'state', abstract_state)
+
+opt = OptExoJAX()
+graphdef, restored = opt.restore_state(opaemulator_decoder, ckpt_dir)
+state_restored = restored.state
+metadata = restored.metadata
+nu_grid = restored.nu_grid
+    
+
+#state_restored = checkpointer.restore(ckpt_dir / 'state', abstract_state)
 #nnx.display(state_restored)
 
 emulator_model = nnx.merge(graphdef, state_restored)
 input_par = jnp.array([729.0, jnp.log10(3.0e-1)])
 output_vector = emulator_model(input_par)
-offset = 22.0
-factor = 0.3
-def xs_prediction(output_vector, offset, factor):
-    return 10 ** (output_vector / factor - offset)
 
-xs_pred = xs_prediction(output_vector, offset, factor)
+xs_pred = opt.xs_prediction(output_vector)
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
-plt.plot(xs_pred, alpha=1, lw=2)
+plt.plot(nu_grid, xs_pred, alpha=1, lw=2)
 plt.yscale("log")
 plt.savefig("restored.png")  # R: lerning rate 1e-4
 

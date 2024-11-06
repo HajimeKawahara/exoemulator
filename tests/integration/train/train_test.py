@@ -62,15 +62,13 @@ def test_training():
     plt.plot(nu_grid, 1.0 - xs_pred / xs_ref, lw=1)
     ax2.set_xlabel("wavenumber (cm-1)")
     ax2.set_ylabel("relative error")
-    plt.savefig(outfile)  # R: lerning rate 1e-4
+    plt.savefig(outfile) 
     #    plt.show()
 
     _, state = nnx.split(model)
-    nnx.display(state)
-    checkpointer = ocp.StandardCheckpointer()
-    checkpointer.save(ckpt_dir / "state", state)
-    checkpointer.wait_until_finished()
+    #nnx.display(state)
 
+    opt.save_state(ckpt_dir, state)
 
 if __name__ == "__main__":
     test_training()
