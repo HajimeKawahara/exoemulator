@@ -1,8 +1,15 @@
+"""nnx models for opacity emulator
+
+"""
+
 from flax import nnx
 
 
-class EmuMlpDecoder(nnx.Module):
-    """simple decoder type MLP neuralnet emulator model
+class opaemulator_decoder(nnx.Module):
+    """nnx model of a simple decoder type MLP opacity emulator
+
+    Notes:
+        This model assumes two input (T,P) and grid_length output (cross section)
 
     Args:
         nnx (_type_): nnx module
@@ -10,7 +17,6 @@ class EmuMlpDecoder(nnx.Module):
     """
 
     def __init__(self, *, rngs: nnx.Rngs, grid_length: int):
-    #def __init__(self, rngs: nnx.Rngs, grid_length: int):
         self.dense_entrance = nnx.Linear(in_features=2, out_features=16, rngs=rngs)
         self.dense_1 = nnx.Linear(in_features=16, out_features=32, rngs=rngs)
         self.dense_2 = nnx.Linear(in_features=32, out_features=256, rngs=rngs)
@@ -25,4 +31,3 @@ class EmuMlpDecoder(nnx.Module):
         x = nnx.gelu(self.dense_2(x))
         x = nnx.gelu(self.dense_3(x))
         return self.dense_out(x)
-

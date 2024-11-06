@@ -7,14 +7,14 @@ import orbax.checkpoint as ocp
 import jax
 from jax import numpy as jnp
 import numpy as np
-from exoemulator.model.decoder import EmuMlpDecoder
+from exoemulator.model.decoder import opaemulator_decoder
 from pathlib import Path
 
 ckpt_dir = Path("/home/kawahara/checkpoints")
 checkpointer = ocp.StandardCheckpointer()
 
 # Restore the checkpoint back to its `nnx.State` structure - need an abstract reference.
-abstract_model = nnx.eval_shape(lambda: EmuMlpDecoder(rngs=nnx.Rngs(0), grid_length=20000))
+abstract_model = nnx.eval_shape(lambda: opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=20000))
 graphdef, abstract_state = nnx.split(abstract_model)
 nnx.display(abstract_state)
 

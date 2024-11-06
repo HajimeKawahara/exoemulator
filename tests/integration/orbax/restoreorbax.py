@@ -4,7 +4,7 @@ import orbax.checkpoint as ocp
 import jax
 from jax import numpy as jnp
 import numpy as np
-from exoemulator.model.decoder import EmuMlpDecoder
+from exoemulator.model.decoder import opaemulator_decoder
 
 
 class TwoLayerMLP(nnx.Module):
@@ -25,17 +25,32 @@ ckpt_dir = Path("/home/kawahara/tmp_checkpoints/")
 
 # Restore the checkpoint back to its `nnx.State` structure - need an abstract reference.
 # abstract_model = nnx.eval_shape(lambda: TwoLayerMLP(4, rngs=nnx.Rngs(0)))
-abstract_model = nnx.eval_shape(
-    lambda: EmuMlpDecoder(rngs=nnx.Rngs(0), grid_length=20000)
-)
-graphdef, abstract_state = nnx.split(abstract_model)
 # print('The abstract NNX state (all leaves are abstract arrays):')
 # nnx.display(abstract_state)
 
 metadata_store = True
 
+
+
+
 if metadata_store:
     checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler("state", "metadata"))
+    
+    # load metadata only
+    restored = checkpointer.restore(
+        ckpt_dir / "state",
+        args=ocp.args.Composite(
+            metadata=ocp.args.JsonRestore(),
+        ),
+    )
+    print(restored.metadata)
+    grid_length = restored.metadata["grid_length"]
+    abstract_model = nnx.eval_shape(
+    lambda: opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=grid_length)
+    )
+    graphdef, abstract_state = nnx.split(abstract_model)
+
+    # restore the state
     restored = checkpointer.restore(
         ckpt_dir / "state",
         args=ocp.args.Composite(
@@ -48,6 +63,10 @@ if metadata_store:
     print(metadata)
 
 else:
+    abstract_model = nnx.eval_shape(
+    lambda: opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=20000)
+    )
+    graphdef, abstract_state = nnx.split(abstract_model)
     checkpointer = ocp.StandardCheckpointer()
     state_restored = checkpointer.restore(ckpt_dir / "state", abstract_state)
 

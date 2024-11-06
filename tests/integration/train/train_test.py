@@ -1,18 +1,15 @@
-import test
 from exoemulator.train.opacity import OptExoJAX
-from exoemulator.model.mlp import EmuMlp
-from exoemulator.model.decoder import EmuMlpDecoder
-
+from exoemulator.model.decoder import opaemulator_decoder
+import matplotlib.pyplot as plt
 from flax import nnx
 import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import tqdm
-import optax
 
 import orbax.checkpoint as ocp
 
-ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/checkpoints")
+# ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/checkpoints")
+ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/checkpoints_tmp")
 
 
 def test_training():
@@ -31,62 +28,32 @@ def test_training():
     mdb = mock_mdbExomol()
     opa = OpaPremodit(mdb, nu_grid, auto_trange=trange)
     # emulator_model = EmuMlp(rngs=nnx.Rngs(0), grid_length=len(nu_grid))
-    emulator_model = EmuMlpDecoder(rngs=nnx.Rngs(0), grid_length=len(nu_grid))
-    opt = OptExoJAX(opa=opa)
+    emu_model = opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=len(nu_grid))
+    metrics = nnx.MultiMetric(loss=nnx.metrics.Average("loss"))
 
-    # optimizer
-    learning_rate = 1e-4
-    lrlog = int(np.log10(learning_rate))
-    momentum = 0.9
-    optimizer = nnx.Optimizer(emulator_model, optax.adamw(learning_rate, momentum))
+    opt = OptExoJAX(opa=opa, emu=emu_model, metrics=metrics)
 
     # defines metrics
-    metrics = nnx.MultiMetric(loss=nnx.metrics.Average("loss"))
-    nsample = 50  # default 300
-    niter = 3000000
-    #niter = 10000
-    tag = str(lrlog) + "n" + str(nsample) + "niter" + str(niter)
-    outfile = "mlp_emulator_R" + tag + ".png"
+
+    # optimizer
+    learning_rate_arr = np.logspace(-4, -6, 3)
+    # niter_arr = [2000000, 2000000, 2000000]
+    niter_arr = [1000, 1000, 1000]
+
+    tag = "decoder_" + str(len(learning_rate_arr)) + "lrc"
+    outfile = "mlp_emulator_" + tag + ".png"
     print("outfile:", outfile)
 
-    lossarr = []
-    testlossarr = []
+    opt.train(trange, prange, learning_rate_arr, niter_arr)
 
-    for i in tqdm.tqdm(range(niter)):
-        input_parameters, logxs = opt.generate_batch(
-            trange=trange, prange=prange, nsample=nsample, method="lhs"
-        )
-        loss = opt.train_step(
-            emulator_model, optimizer, metrics, input_parameters, logxs
-        )
-        if np.mod(i, 100) == 0:
-            input_parameters, logxs = opt.generate_batch(
-                trange=trange, prange=prange, nsample=nsample, method="lhs"
-            )
-            testloss = opt.evaluate_step(emulator_model, input_parameters, logxs)
-            lossarr.append(loss)
-            testlossarr.append(testloss)
-
-    optimizer = nnx.Optimizer(emulator_model, optax.adamw(learning_rate, momentum))
-
-
-
-    # plot loss
-    np.savez("loss"+tag+".npz", lossarr=lossarr, testlossarr=testlossarr)
-    plt.plot(lossarr[10:], label="train")
-    plt.plot(testlossarr[10:], label="test")
-    plt.yscale("log")
-    plt.xscale("log")
-    plt.legend()
-    plt.savefig("loss"+tag+".png")
+    # save loss (use plotloss.py for plotting)
+    np.savez("loss" + tag + ".npz", lossarr=opt.lossarr, testlossarr=opt.testlossarr)
 
     # test prediction
     input_par = jnp.array([729.0, jnp.log10(3.0e-1)])
-    output_vector = emulator_model(input_par)
+    output_vector = emu_model(input_par)
     xs_ref = opt.opa.xsvector(input_par[0], 10 ** input_par[1])
-    offset = 22.0
-    factor = 0.3
-    xs_pred = xs_prediction(output_vector, offset, factor)
+    xs_pred = opt.xs_prediction(output_vector)
 
     # plot
     fig = plt.figure()
@@ -100,17 +67,13 @@ def test_training():
     ax2.set_xlabel("wavenumber (cm-1)")
     ax2.set_ylabel("relative error")
     plt.savefig(outfile)  # R: lerning rate 1e-4
-    plt.show()
+    #    plt.show()
 
-    _, state = nnx.split(emulator_model)
+    _, state = nnx.split(emu_model)
     nnx.display(state)
     checkpointer = ocp.StandardCheckpointer()
     checkpointer.save(ckpt_dir / "state", state)
     checkpointer.wait_until_finished()
-
-
-def xs_prediction(output_vector, offset, factor):
-    return 10 ** (output_vector / factor - offset)
 
 
 if __name__ == "__main__":
