@@ -224,68 +224,7 @@ class OptExoJAX:
             ),
         )
 
-    def restore_state(self, model, ckpt_dir: pathlib.Path):
-        """restore the state of the model        
-        
-        Args:
-            model: exoemulator model
-            ckpt_dir (pathlib.Path): checkpoint directory
-
-        Returns:
-            graphdef, restored
-        """
-        checkpointer = ocp.Checkpointer(
-            ocp.CompositeCheckpointHandler("state", "nu_grid", "metadata")
-        )
-
-        # load metadata only
-        restored = checkpointer.restore(
-            ckpt_dir / "state",
-            args=ocp.args.Composite(
-                metadata=ocp.args.JsonRestore(),
-            ),
-        )
-        # generate an abstract model
-        abstract_model = nnx.eval_shape(
-            lambda: model(
-                rngs=nnx.Rngs(0), grid_length=restored.metadata["grid_length"]
-            )
-        )
-        graphdef, abstract_state = nnx.split(abstract_model)
-
-        # restore the state
-        restored = checkpointer.restore(
-            ckpt_dir / "state",
-            args=ocp.args.Composite(
-                state=ocp.args.StandardRestore(abstract_state),
-                nu_grid=ocp.args.ArrayRestore(),
-                metadata=ocp.args.JsonRestore(),
-            ),
-        )
-
-        self.trange = restored.metadata["trange"]
-        self.prange = restored.metadata["prange"]
-        self.offset = restored.metadata["offset"]
-        self.factor = restored.metadata["factor"]
-
-        return graphdef, restored
-
-    def restore_model(self, model, ckpt_dir: pathlib.Path):
-        """restore the model
-        
-        Args:
-            model: exoemulator model
-            ckpt_dir (pathlib.Path): checkpoint directory
-
-        Returns:
-            emulator_model
-        """
-        graphdef, restored = self.restore_state(model, ckpt_dir)
-        self.nu_grid = restored.nu_grid
-
-        emulator_model = nnx.merge(graphdef, restored.state)
-        return emulator_model
-
+    
 
 if __name__ == "__main__":
     opt = OptExoJAX()
