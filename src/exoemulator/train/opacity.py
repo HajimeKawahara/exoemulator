@@ -17,6 +17,7 @@ import optax
 import orbax.checkpoint as ocp
 import pathlib
 
+
 class OptExoJAX:
     """Opacity Training with ExoJAX"""
 
@@ -72,8 +73,8 @@ class OptExoJAX:
             raise NotImplementedError(f"Method {method} is not implemented")
 
     def xs_prediction(self, output_vector):
-        """ Predicts cross section from the output vector
-        
+        """Predicts cross section from the output vector
+
         Args:
             output_vector (array): The output vector from the emulator model.
 
@@ -91,7 +92,7 @@ class OptExoJAX:
         input_parameter,
         label_vector,
     ):
-        """ Trains the model for one step.
+        """Trains the model for one step.
         Args:
             model (nnx.Module): The neural network model to be trained.
             optimizer (nnx.Optimizer): The optimizer used to update the model parameters.
@@ -115,12 +116,12 @@ class OptExoJAX:
         input_parameter,
         label_vector,
     ):
-        """ Evaluates the model on the test data.
+        """Evaluates the model on the test data.
         Args:
             model (nnx.Module): The neural network model to be evaluated.
             input_parameter (Any): The input data for the model.
             label_vector (Any): The true labels corresponding to the input data.
-            
+
         Returns:
             float: The loss value computed for the given input and label.
         """
@@ -135,24 +136,24 @@ class OptExoJAX:
         trange,
         prange,
         learning_rate_arr,
-        niter_arr,
-        nsample_minibatch=100,
+        batch_size_arr,
+        train_update_interval_arr,
+        nepoch_arr,
         adamw_momentum=0.9,
-        n_single_learn=20,
         metric_save_interval=100,
     ):
-        """ Trains the model using the given parameters.
-        
+        """Trains the model using the given parameters.
+
         Args:
             model (nnx.Module): The neural network model to be trained.
             metrics (nnx.MultiMetric): Metrics to evaluate the model's performance.
             trange (tuple): Range of temperature values for training data generation.
             prange (tuple): Range of pressure values for training data generation.
             learning_rate_arr (list): List of learning rates for each training phase.
-            niter_arr (list): List of iteration counts for each training phase.
-            nsample_minibatch (int, optional): Number of samples in each minibatch. Defaults to 100.
+            batch_size_arr (list): List of batch sizes for each training phase.
+            train_update_interval_arr (list): List of numbers of iterations before generating a new batch of data.
+            nepoch_arr (list): List of iteration counts for each training phase.
             adamw_momentum (float, optional): Momentum parameter for the AdamW optimizer. Defaults to 0.9.
-            n_single_learn (int, optional): Number of iterations before generating a new batch of data. Defaults to 20.
             metric_save_interval (int, optional): Interval for saving metrics during training. Defaults to 100.
         """
 
@@ -161,19 +162,17 @@ class OptExoJAX:
         self.trange = trange
         self.prange = prange
 
-        N_lr = len(learning_rate_arr)
-        for j in range(N_lr):
-            learning_rate = learning_rate_arr[
-                j
-            ]  # learning rate scheduling (step decay)
-            optimizer = nnx.Optimizer(model, optax.adamw(learning_rate, adamw_momentum))
-            description = self._desc_for_tqdm(N_lr, j, learning_rate)
-            for i in tqdm.tqdm(range(niter_arr[j]), desc=description):
-                if np.mod(i, n_single_learn) == 0:
+        nsch = len(learning_rate_arr)
+        for jsch in range(nsch):
+            learnrate = learning_rate_arr[jsch]  # learning rate scheduling (step decay)
+            optimizer = nnx.Optimizer(model, optax.adamw(learnrate, adamw_momentum))
+            description = self._desc_for_tqdm(nsch, jsch, learnrate)
+            for i in tqdm.tqdm(range(nepoch_arr[jsch]), desc=description):
+                if np.mod(i, train_update_interval_arr[jsch]) == 0:
                     input_parameters, logxs = self.generate_batch(
                         trange=self.trange,
                         prange=self.prange,
-                        nsample=nsample_minibatch,
+                        nsample=batch_size_arr[jsch],
                         method="lhs",
                     )
                 loss = self.train_step(
@@ -183,7 +182,7 @@ class OptExoJAX:
                     input_parameters, logxs = self.generate_batch(
                         trange=self.trange,
                         prange=self.prange,
-                        nsample=nsample_minibatch,
+                        nsample=batch_size_arr[jsch],
                         method="lhs",
                     )
                     testloss = self.evaluate_step(model, input_parameters, logxs)
@@ -191,7 +190,7 @@ class OptExoJAX:
                     self.testlossarr.append(testloss)
 
     def _desc_for_tqdm(self, N_lr, j, learning_rate):
-        """ Generates a description for the tqdm progress bar."""
+        """Generates a description for the tqdm progress bar."""
         description = (
             "learning rate: " + str(learning_rate) + ":" + str(j + 1) + "/" + str(N_lr)
         )
@@ -200,7 +199,7 @@ class OptExoJAX:
 
     def save_state(self, ckpt_dir: pathlib.Path, state):
         """save the state of the model
-        
+
         Args:
             ckpt_dir: checkpoint directory
             state: state
@@ -224,7 +223,6 @@ class OptExoJAX:
             ),
         )
 
-    
 
 if __name__ == "__main__":
     opt = OptExoJAX()

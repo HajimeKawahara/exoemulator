@@ -1,6 +1,7 @@
 from flax import nnx
 from functools import partial
 from jax import jit
+from jax import vmap
 import jax.numpy as jnp
 import orbax.checkpoint as ocp
 import pathlib
@@ -33,6 +34,12 @@ class OpaEmulator:
         input_par = jnp.array([T, jnp.log10(P)])
         output_vector = self.emulator_model(input_par)
         return 10 ** (output_vector / self.factor - self.offset)
+
+    @partial(jit, static_argnums=(0,))
+    def xsmatrix(self, Tarr, Parr):
+        vmap_xsvector = vmap(self.xsvector,(0,0))
+        return vmap_xsvector(Tarr, Parr)
+
 
     def restore_state(self, model):
         """restore the state of the model

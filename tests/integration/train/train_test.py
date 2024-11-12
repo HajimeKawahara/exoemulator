@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 
 import orbax.checkpoint as ocp
 
-ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/checkpoints")
-#ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/checkpoints_tmp")
+ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/ckp/schedule3")
+# ckpt_dir = ocp.test_utils.erase_and_create_empty("/home/kawahara/checkpoints_tmp")
 
 
 def test_training():
@@ -24,23 +24,31 @@ def test_training():
     prange = [1.0e-5, 1.0e2]
 
     nu_grid, wav, res = mock_wavenumber_grid()
-    print(nu_grid.shape)  # 20000
     mdb = mock_mdbExomol()
     opt = OptExoJAX(opa=OpaPremodit(mdb, nu_grid, auto_trange=trange))
 
     model = opaemulator_decoder(rngs=nnx.Rngs(0), grid_length=len(nu_grid))
     metrics = nnx.MultiMetric(loss=nnx.metrics.Average("loss"))
 
-    # leanirng rate and niter
-    learning_rate_arr = np.logspace(-4, -6, 3)
-    niter_arr = [3000000, 3000000, 3000000]
-    #niter_arr = [1000, 1000, 1000]
-
-    tag = "decoder_" + str(len(learning_rate_arr)) + "lrc"
+    # scheduler
+    learning_rate_arr = [1.0e-4, 1.0e-5, 1.0e-6]
+    nepoch_arr = [3000000, 3000000, 3000000]
+    batch_size_arr = [100, 100, 100] # [100, 100, 100]
+    train_update_interval_arr = [20, 20, 20] # [20, 20, 20]
+    tag = "decoder_3schedule" # 
     outfile = "mlp_emulator_" + tag + ".png"
     print("outfile:", outfile)
 
-    opt.train(model, metrics, trange, prange, learning_rate_arr, niter_arr)
+    opt.train(
+        model,
+        metrics,
+        trange,
+        prange,
+        learning_rate_arr,
+        batch_size_arr,
+        train_update_interval_arr,
+        nepoch_arr,
+    )
 
     # save loss (use plotloss.py for plotting)
     np.savez("loss" + tag + ".npz", lossarr=opt.lossarr, testlossarr=opt.testlossarr)
@@ -62,13 +70,14 @@ def test_training():
     plt.plot(nu_grid, 1.0 - xs_pred / xs_ref, lw=1)
     ax2.set_xlabel("wavenumber (cm-1)")
     ax2.set_ylabel("relative error")
-    plt.savefig(outfile) 
+    plt.savefig(outfile)
     #    plt.show()
 
     _, state = nnx.split(model)
-    #nnx.display(state)
+    # nnx.display(state)
 
     opt.save_state(ckpt_dir, state)
+
 
 if __name__ == "__main__":
     test_training()

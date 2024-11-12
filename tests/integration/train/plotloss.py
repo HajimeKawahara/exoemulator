@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-tag = "decoder_3lrc"
+tag = "decoder_4schedule"
 #tag = "Pattmp_n100niter1500000"
 
 arr = np.load("loss"+tag+".npz")
